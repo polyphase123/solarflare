@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airbus A320/A321 Update Crisis Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;600;800&display=swap');
+        
+        /* OPS CENTER LIGHT THEME */
+        :root {
+            --bg-color: #f1f5f9; /* Slate 100 */
+            --panel-bg: #ffffff;
+            --text-main: #0f172a; /* Slate 900 */
+            --text-muted: #64748b; /* Slate 500 */
+            --accent-cyan: #0284c7; /* Sky 600 - Darker for light mode visibility */
+            --accent-green: #16a34a; /* Green 600 */
+            --accent-amber: #d97706; /* Amber 600 */
+            --accent-red: #dc2626; /* Red 600 */
+            --border-color: #cbd5e1; /* Slate 300 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+        }
+        
+        .tech-font {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        /* Technical Panel Style (Light Mode) */
+        .ops-panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Industrial marking corners */
+        .ops-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 4px; height: 100%;
+            background: var(--accent-cyan);
+            opacity: 0.5;
+        }
+
+        .text-cyan { color: var(--accent-cyan); }
+        .text-green { color: var(--accent-green); }
+        .text-amber { color: var(--accent-amber); }
+        .text-red { color: var(--accent-red); }
+
+        /* Navigation Active State */
+        .nav-btn.active {
+            background-color: #e0f2fe; /* Sky 100 */
+            border-right: 4px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            font-weight: bold;
+        }
+
+        /* Modal Backdrop */
+        .modal-backdrop {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+        }
+
+        .blink-warning {
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* Simulator container should remain dark for contrast */
+        #sim-container {
+            background-color: #000;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row overflow-hidden selection:bg-sky-200">
+
+    <!-- Mobile Navigation Toggle -->
+    <div class="md:hidden p-4 bg-white border-b border-slate-200 flex justify-between items-center z-50 shadow-sm">
+        <h1 class="text-xl font-bold tech-font text-cyan-700 tracking-wider">A320<span class="text-slate-900">OPS</span></h1>
+        <button onclick="toggleMobileMenu()" class="text-slate-700 p-2">
+            <i data-lucide="menu"></i>
+        </button>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="hidden md:flex flex-col w-72 bg-white border-r border-slate-200 h-screen overflow-y-auto shadow-xl z-10">
+        <div class="p-6 border-b border-slate-100 bg-slate-50">
+            <div class="flex items-center gap-2 mb-1">
+                <i data-lucide="plane" class="text-cyan-600 w-6 h-6"></i>
+                <h1 class="text-2xl font-bold tech-font text-slate-800 tracking-widest">CRISIS<span class="text-cyan-600">CENTER</span></h1>
+            </div>
+            <p class="text-[10px] text-slate-500 tech-font uppercase tracking-widest">Sys Ver. A320-L104-FIX</p>
+        </div>
+        
+        <div class="flex-1 px-2 py-4 space-y-1">
+            <button onclick="showSection('dashboard')" class="nav-btn active w-full flex items-center gap-3 p-3 rounded transition-all text-slate-500 hover:bg-slate-50">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span class="font-semibold text-sm">Operations Dashboard</span>
+            </button>
+            <button onclick="showSection('risk-analysis')" class="nav-btn w-full flex items-center gap-3 p-3 rounded transition-all text-slate-500 hover:bg-slate-50">
+                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                <span class="font-semibold text-sm">Risk & Safety Case</span>
+            </button>
+             <button onclick="showSection('simulator')" class="nav-btn w-full flex items-center gap-3 p-3 rounded transition-all text-slate-500 hover:bg-slate-50">
+                <i data-lucide="joystick" class="w-5 h-5"></i>
+                <span class="font-semibold text-sm">Flight Simulator</span>
+            </button>
+            <button onclick="showSection('rights')" class="nav-btn w-full flex items-center gap-3 p-3 rounded transition-all text-slate-500 hover:bg-slate-50">
+                <i data-lucide="book-open-check" class="w-5 h-5"></i>
+                <span class="font-semibold text-sm">Passenger Rights</span>
+            </button>
+            <button onclick="showSection('leaflet')" class="nav-btn w-full flex items-center gap-3 p-3 rounded transition-all text-slate-500 hover:bg-slate-50">
+                <i data-lucide="globe-2" class="w-5 h-5"></i>
+                <span class="font-semibold text-sm">Global Impact Map</span>
+            </button>
+        </div>
+
+        <div class="p-4 mt-auto border-t border-slate-100">
+             <button onclick="toggleModal('source-modal')" class="w-full bg-slate-100 border border-slate-300 text-slate-700 p-3 rounded flex items-center justify-center gap-2 hover:bg-slate-200 transition text-xs font-bold">
+                <i data-lucide="database" class="w-4 h-4"></i>
+                DATA SOURCES
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu Overlay -->
+    <div id="mobile-menu" class="fixed inset-0 bg-white z-40 hidden flex-col p-6 space-y-4 pt-20">
+        <button onclick="showSection('dashboard'); toggleMobileMenu()" class="text-left text-lg text-slate-800 font-bold py-3 border-b border-slate-100">Dashboard</button>
+        <button onclick="showSection('risk-analysis'); toggleMobileMenu()" class="text-left text-lg text-slate-800 font-bold py-3 border-b border-slate-100">Risk & Safety</button>
+        <button onclick="showSection('simulator'); toggleMobileMenu()" class="text-left text-lg text-slate-800 font-bold py-3 border-b border-slate-100">Simulator</button>
+        <button onclick="showSection('rights'); toggleMobileMenu()" class="text-left text-lg text-slate-800 font-bold py-3 border-b border-slate-100">Passenger Rights</button>
+        <button onclick="toggleModal('source-modal'); toggleMobileMenu()" class="text-left text-lg text-cyan-700 font-bold py-3 border-b border-slate-100">View Data Sources</button>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 h-screen overflow-y-auto relative bg-slate-50 p-2 md:p-8">
+        
+        <!-- DASHBOARD SECTION -->
+        <section id="dashboard" class="space-y-6 max-w-7xl mx-auto pb-20">
+            <header class="flex flex-col md:flex-row justify-between items-end border-b border-slate-300 pb-4 mb-6">
+                <div>
+                    <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">System Overview</h2>
+                    <p class="text-slate-500 font-mono text-sm mt-1">STATUS: <span class="text-amber-600 font-bold">ACTIVE ADVISORY</span> | DATE: NOV 29-30, 2025</p>
+                </div>
+                <div class="mt-4 md:mt-0">
+                    <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-200">LIVE MONITORING</span>
+                </div>
+            </header>
+
+            <!-- CAAP Alert Panel -->
+            <div class="ops-panel p-6 bg-amber-50 border-amber-200">
+                <div class="flex items-start gap-4">
+                    <i data-lucide="alert-circle" class="text-amber-600 w-8 h-8 flex-shrink-0"></i>
+                    <div>
+                        <h3 class="text-amber-800 font-bold text-lg mb-1">CAAP / CAB Advisory: Traffic Rules Active</h3>
+                        <p class="text-slate-700 text-sm">
+                            Mandatory Refunds, Rebooking (No Penalties), and Hotel Amenities mandated for all flights cancelled due to the Airbus Technical Directive.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Fleet Status -->
+                <div class="ops-panel p-4 bg-white">
+                    <p class="text-xs font-bold text-slate-400 uppercase mb-2">Cebu Pacific Fleet</p>
+                    <div class="flex justify-between items-end">
+                        <span class="text-3xl font-bold text-slate-900 tech-font">45</span>
+                        <span class="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">19 Updated</span>
+                    </div>
+                    <div class="w-full bg-slate-200 h-1.5 mt-3 rounded-full overflow-hidden">
+                        <div class="bg-green-500 h-full" style="width: 42%"></div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">A320/A321 Aircraft</p>
+                </div>
+
+                <!-- Cancellation Count -->
+                <div class="ops-panel p-4 bg-white">
+                    <p class="text-xs font-bold text-slate-400 uppercase mb-2">Total Cancellations</p>
+                    <div class="flex justify-between items-end">
+                        <span class="text-3xl font-bold text-red-600 tech-font">~78</span>
+                        <i data-lucide="plane-off" class="text-red-200 w-6 h-6"></i>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Combined CEB & PAL</p>
+                </div>
+
+                <!-- Economic Impact (New) -->
+                <div class="ops-panel p-4 bg-white border-l-4 border-l-slate-400">
+                    <p class="text-xs font-bold text-slate-400 uppercase mb-2">Est. Economic Cost</p>
+                    <div class="flex justify-between items-end">
+                        <span class="text-2xl font-bold text-slate-800 tech-font">₱100M+</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Revenue Loss + Amenities</p>
+                    <p class="text-[10px] text-slate-400">Based on avg fare/pax count</p>
+                </div>
+
+                <!-- Tech Cause -->
+                <div class="ops-panel p-4 bg-white">
+                    <p class="text-xs font-bold text-slate-400 uppercase mb-2">Root Cause</p>
+                    <div class="flex justify-between items-end">
+                        <span class="text-lg font-bold text-purple-600 tech-font">SOLAR FLARE</span>
+                        <i data-lucide="zap" class="text-purple-200 w-6 h-6"></i>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Bit-Flip in ELAC Memory</p>
+                </div>
+            </div>
+
+            <!-- Cancellation Table -->
+            <div class="ops-panel p-0 overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                    <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                        <i data-lucide="list" class="w-4 h-4"></i>
+                        Priority Cancellation List (Cebu Pacific)
+                    </h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-100 text-slate-500 text-xs uppercase font-semibold">
+                            <tr>
+                                <th class="p-4">Flight No.</th>
+                                <th class="p-4">Origin</th>
+                                <th class="p-4">Destination</th>
+                                <th class="p-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-sm">
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-4 font-mono font-bold text-slate-700">5J 899/900</td>
+                                <td class="p-4">Manila (MNL)</td>
+                                <td class="p-4">Caticlan (MPH)</td>
+                                <td class="p-4"><span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">CANCELLED</span></td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-4 font-mono font-bold text-slate-700">5J 2511/2502</td>
+                                <td class="p-4">Manila (MNL)</td>
+                                <td class="p-4">Cebu (CEB)</td>
+                                <td class="p-4"><span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">CANCELLED</span></td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-4 font-mono font-bold text-slate-700">5J 4761/4760</td>
+                                <td class="p-4">Puerto Princesa</td>
+                                <td class="p-4">Davao (DVO)</td>
+                                <td class="p-4"><span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">CANCELLED</span></td>
+                            </tr>
+                             <tr class="hover:bg-slate-50">
+                                <td class="p-4 font-mono font-bold text-slate-700">5J 395/396</td>
+                                <td class="p-4">Manila (MNL)</td>
+                                <td class="p-4">Cagayan De Oro</td>
+                                <td class="p-4"><span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">CANCELLED</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- RISK ANALYSIS & DISASTER SCENARIOS -->
+        <section id="risk-analysis" class="hidden space-y-6 max-w-5xl mx-auto pb-20">
+            <header class="border-b border-slate-300 pb-4">
+                <h2 class="text-3xl font-extrabold text-slate-900">Safety Case & Risk Analysis</h2>
+                <p class="text-slate-500">Why cancellation is the only option: The "What If" scenarios.</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Scenario 1 -->
+                <div class="ops-panel p-6 bg-red-50 border-red-200">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="bg-red-600 text-white p-2 rounded">
+                            <i data-lucide="arrow-down-circle" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-red-900 font-bold text-lg">Scenario A: Loss of Control (LOC-I)</h3>
+                    </div>
+                    <p class="text-slate-800 text-sm mb-4">
+                        <strong>The Threat:</strong> The ELAC (Elevator Aileron Computer) receives corrupt data due to a solar bit-flip. It falsely detects a "Stall" and commands the nose of the plane to pitch down violently to gain speed.
+                    </p>
+                    <p class="text-slate-800 text-sm font-bold mb-2">Potential Outcome:</p>
+                    <ul class="list-disc pl-5 text-sm text-slate-700 space-y-1">
+                        <li>Pilots fight the stick against the computer.</li>
+                        <li>Structural stress exceeds airframe limits (G-force overload).</li>
+                        <li><strong>High Altitude:</strong> Severe injuries to passengers (as seen in JetBlue incident).</li>
+                        <li><strong>Low Altitude (Takeoff/Landing):</strong> <span class="text-red-600 font-bold">Unrecoverable crash into terrain.</span></li>
+                    </ul>
+                </div>
+
+                <!-- Scenario 2 -->
+                <div class="ops-panel p-6 bg-slate-800 border-slate-900 text-white">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="bg-slate-600 p-2 rounded">
+                            <i data-lucide="skull" class="w-6 h-6 text-white"></i>
+                        </div>
+                        <h3 class="font-bold text-lg text-white">Scenario B: Hull Loss</h3>
+                    </div>
+                    <p class="text-slate-300 text-sm mb-4">
+                        <strong>The Cost of "No Action":</strong> If flights were not grounded and a single A320 was lost due to this software glitch:
+                    </p>
+                    <div class="space-y-3">
+                         <div class="flex justify-between items-center border-b border-slate-600 pb-2">
+                            <span class="text-xs text-slate-400">HUMAN LIFE</span>
+                            <span class="font-bold text-red-400">CATASTROPHIC</span>
+                        </div>
+                        <div class="flex justify-between items-center border-b border-slate-600 pb-2">
+                            <span class="text-xs text-slate-400">AIRCRAFT COST</span>
+                            <span class="font-mono text-cyan-400">~$100 Million USD</span>
+                        </div>
+                         <div class="flex justify-between items-center border-b border-slate-600 pb-2">
+                            <span class="text-xs text-slate-400">LIABILITY/LAWSUITS</span>
+                            <span class="font-mono text-cyan-400">~$500 Million+ USD</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ops-panel p-6">
+                <h3 class="font-bold text-slate-800 mb-4">Financial Breakdown: Cancellation vs. Disaster</h3>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-sm font-bold text-slate-700">Cost of Current Cancellations (Refunds/Hotels)</span>
+                            <span class="text-sm font-bold text-slate-700">₱100 Million (Est)</span>
+                        </div>
+                        <div class="w-full bg-slate-200 rounded-full h-4">
+                            <div class="bg-blue-500 h-4 rounded-full" style="width: 10%"></div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-sm font-bold text-slate-700">Cost of Single Hull Loss (Disaster)</span>
+                            <span class="text-sm font-bold text-slate-700">₱30 Billion+</span>
+                        </div>
+                        <div class="w-full bg-slate-200 rounded-full h-4">
+                            <div class="bg-red-600 h-4 rounded-full" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 italic mt-2">
+                        *Conclusion: Grounding 78 flights is financially painful but insignificant compared to the potential loss of a single aircraft and lives.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SIMULATOR SECTION -->
+        <section id="simulator" class="hidden h-full flex flex-col relative pb-10">
+            <div class="bg-white p-4 border-b border-slate-200 mb-4">
+                 <h2 class="text-2xl font-bold text-slate-900">ELAC Failure Simulator</h2>
+                 <p class="text-slate-500 text-sm">Experience the "Solar Bit-Flip" Phenomenon</p>
+            </div>
+            
+            <div id="sim-container" class="flex-1 relative overflow-hidden border-4 border-slate-800 rounded-lg shadow-2xl mx-4">
+                <!-- 3D Canvas -->
+                <div id="canvas-wrapper" class="absolute inset-0 z-0"></div>
+                
+                <!-- PFD Overlay -->
+                <div class="absolute inset-0 z-10 pointer-events-none p-4 flex flex-col justify-between">
+                    <!-- Top Info -->
+                    <div class="flex justify-between items-start">
+                        <div class="bg-black/60 p-2 border border-slate-500 rounded backdrop-blur-sm">
+                            <div class="text-cyan-400 font-bold tech-font text-sm">SPD <span id="sim-spd" class="text-green-400 text-lg">450</span></div>
+                            <div class="text-cyan-400 font-bold tech-font text-sm">ALT <span id="sim-alt" class="text-green-400 text-lg">32000</span></div>
+                        </div>
+                        <!-- Solar Warning -->
+                        <div id="solar-warning" class="hidden bg-red-900/90 border-2 border-red-500 p-4 rounded animate-pulse">
+                            <div class="text-white font-bold text-xl tech-font text-center">MASTER WARNING</div>
+                            <div class="text-amber-400 text-sm tech-font text-center mt-1">ELAC 1 FAULT</div>
+                            <div class="text-amber-400 text-sm tech-font text-center">PITCH DIRECT LAW</div>
+                        </div>
+                    </div>
+
+                    <!-- Center Start Screen -->
+                    <div id="sim-message" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-auto">
+                        <div class="bg-slate-900/95 p-8 max-w-md rounded-lg border border-slate-600 shadow-2xl">
+                            <h1 class="text-2xl font-bold text-cyan-400 tech-font mb-4">SIMULATION READY</h1>
+                            <div class="text-left space-y-2 mb-6 text-sm text-slate-300 font-mono">
+                                <p>> SCENARIO: CRUISE FL320</p>
+                                <p>> INJECT: SOLAR RADIATION</p>
+                                <p>> RISK: UNCOMMANDED PITCH DOWN</p>
+                            </div>
+                            <button onclick="startSim()" class="bg-cyan-700 border border-cyan-500 text-white hover:bg-cyan-600 py-3 px-8 rounded font-bold w-full tech-font tracking-wider transition">
+                                START SIMULATOR
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Stick Visual -->
+                    <div class="flex justify-center items-end pb-8 pointer-events-auto">
+                        <div class="bg-black/50 p-4 border border-slate-600 rounded flex gap-8">
+                            <div class="text-center">
+                                <div class="text-xs text-slate-400 mb-1 tech-font">SIDE STICK</div>
+                                <div class="w-32 h-32 border border-slate-500 rounded-full relative flex items-center justify-center bg-slate-800">
+                                    <div id="stick-position" class="w-4 h-4 bg-cyan-500 rounded-full shadow-[0_0_10px_cyan]"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PASSENGER RIGHTS SECTION -->
+        <section id="rights" class="hidden p-6 max-w-5xl mx-auto space-y-6">
+            <header class="border-b border-slate-300 pb-4">
+                <h2 class="text-3xl font-extrabold text-slate-900">Passenger Bill of Rights</h2>
+                <p class="text-slate-500">CAB / CAAP Regulations for Technical Cancellations</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Card 1 -->
+                <div class="ops-panel p-6 bg-white border-l-4 border-l-green-500">
+                    <div class="flex items-center gap-3 mb-4">
+                        <i data-lucide="ticket" class="text-green-600 w-6 h-6"></i>
+                        <h3 class="text-green-700 font-bold text-lg">Refund & Rebooking</h3>
+                    </div>
+                    <ul class="space-y-3 text-sm text-slate-600 font-medium">
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-green-500 mt-1"></i>
+                            <span>Full refund of ticket price, taxes, and fuel surcharges.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-green-500 mt-1"></i>
+                            <span>Rebooking to next available flight with <strong>NO PENALTY</strong>.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-green-500 mt-1"></i>
+                            <span>Travel Fund conversion options.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="ops-panel p-6 bg-white border-l-4 border-l-amber-500">
+                    <div class="flex items-center gap-3 mb-4">
+                        <i data-lucide="coffee" class="text-amber-600 w-6 h-6"></i>
+                        <h3 class="text-amber-700 font-bold text-lg">Airport Amenities</h3>
+                    </div>
+                    <ul class="space-y-3 text-sm text-slate-600 font-medium">
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-amber-500 mt-1"></i>
+                            <span>Free meals and refreshments.</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-amber-500 mt-1"></i>
+                            <span>Access to communication (calls/texts).</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <i data-lucide="check" class="w-4 h-4 text-amber-500 mt-1"></i>
+                            <span><strong>Hotel + Transport</strong> for overnight delays.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- LEAFLET SECTION -->
+        <section id="leaflet" class="hidden p-6 max-w-6xl mx-auto">
+             <header class="border-b border-slate-300 pb-4 mb-6">
+                <h2 class="text-3xl font-extrabold text-slate-900">Global Impact Map</h2>
+                <p class="text-slate-500">Airlines currently managing the A320 update.</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Country Card Template -->
+                <div class="ops-panel p-4 hover:border-cyan-500 transition-colors group bg-white">
+                    <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-red-100 p-2 rounded-full">
+                                <i data-lucide="map-pin" class="text-red-600 w-5 h-5"></i>
+                            </div>
+                            <h3 class="font-bold text-lg text-slate-800">PHILIPPINES</h3>
+                        </div>
+                        <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">HIGH IMPACT</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between"><span class="text-slate-500">Cebu Pacific</span> <span class="text-amber-600 font-bold">Updating</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">PAL</span> <span class="text-amber-600 font-bold">Cancellations</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">AirAsia</span> <span class="text-green-600 font-bold">Resolved</span></div>
+                    </div>
+                </div>
+
+                 <div class="ops-panel p-4 hover:border-cyan-500 transition-colors group bg-white">
+                    <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                         <div class="flex items-center gap-3">
+                            <div class="bg-slate-100 p-2 rounded-full">
+                                <i data-lucide="map-pin" class="text-slate-600 w-5 h-5"></i>
+                            </div>
+                            <h3 class="font-bold text-lg text-slate-800">USA</h3>
+                        </div>
+                        <span class="text-xs bg-slate-200 text-slate-700 px-2 py-1 rounded font-bold">ORIGIN</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between"><span class="text-slate-500">JetBlue</span> <span class="text-red-600 font-bold">Incident</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">American</span> <span class="text-amber-600 font-bold">Updating</span></div>
+                    </div>
+                </div>
+
+                <div class="ops-panel p-4 hover:border-cyan-500 transition-colors group bg-white">
+                    <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                         <div class="flex items-center gap-3">
+                            <div class="bg-amber-100 p-2 rounded-full">
+                                <i data-lucide="map-pin" class="text-amber-600 w-5 h-5"></i>
+                            </div>
+                            <h3 class="font-bold text-lg text-slate-800">JAPAN</h3>
+                        </div>
+                         <span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded font-bold">DELAYS</span>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between"><span class="text-slate-500">ANA</span> <span class="text-amber-600 font-bold">Cancellations</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Peach</span> <span class="text-amber-600 font-bold">Delays</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- DATA SOURCE POPUP MODAL -->
+    <div id="source-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop p-4">
+        <div class="bg-white border-t-4 border-cyan-600 w-full max-w-2xl rounded-lg shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="database" class="w-5 h-5 text-cyan-600"></i>
+                    Data Sources & References
+                </h3>
+                <button onclick="toggleModal('source-modal')" class="text-slate-400 hover:text-slate-700">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto space-y-6 text-sm text-slate-600">
+                <!-- Data Block 1 -->
+                <div>
+                    <h4 class="text-slate-900 font-bold mb-2 flex items-center gap-2">
+                        <i data-lucide="newspaper" class="text-amber-600 w-4 h-4"></i>
+                        Media Reports (Nov 29, 2025)
+                    </h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li><strong>Inquirer.net:</strong> "PAL, Cebu Pacific cancel 78 flights..."</li>
+                        <li><strong>ABS-CBN News:</strong> "Airline operations back to normal by Nov 30".</li>
+                        <li><strong>SunStar Cebu:</strong> "Mandatory Airbus upgrade..."</li>
+                    </ul>
+                </div>
+
+                <!-- Data Block 2 -->
+                <div>
+                    <h4 class="text-slate-900 font-bold mb-2 flex items-center gap-2">
+                        <i data-lucide="file-text" class="text-green-600 w-4 h-4"></i>
+                        Regulatory Directives
+                    </h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li><strong>CAAP / CAB:</strong> Air Passenger Bill of Rights (APBR).</li>
+                        <li><strong>EASA (EU):</strong> AD 2025-XX-XX (Software L104+).</li>
+                    </ul>
+                </div>
+
+                <!-- Data Block 3 -->
+                <div>
+                     <h4 class="text-slate-900 font-bold mb-2 flex items-center gap-2">
+                        <i data-lucide="route" class="text-cyan-600 w-4 h-4"></i>
+                        Specific Routes Identified
+                    </h4>
+                    <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                        <div class="bg-slate-100 p-2 rounded border border-slate-200">MNL - CATICLAN (5J 899/900)</div>
+                        <div class="bg-slate-100 p-2 rounded border border-slate-200">MNL - CEBU (5J 2511/2502)</div>
+                        <div class="bg-slate-100 p-2 rounded border border-slate-200">MNL - BOHOL (5J 619/620)</div>
+                        <div class="bg-slate-100 p-2 rounded border border-slate-200">PPS - DAVAO (5J 4761/4760)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 bg-slate-50 text-right">
+                <button onclick="toggleModal('source-modal')" class="bg-slate-800 text-white px-6 py-2 rounded font-bold hover:bg-slate-700 transition">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Modal Logic
+        function toggleModal(id) {
+            const modal = document.getElementById(id);
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        // Navigation Logic
+        function showSection(id) {
+            document.querySelectorAll('main > section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+            
+            // Update active state
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Find btn
+            const activeBtn = Array.from(document.querySelectorAll('.nav-btn')).find(btn => btn.getAttribute('onclick').includes(id));
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+
+            if(id === 'simulator') {
+                initThreeJS();
+            }
+        }
+
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            if (menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden');
+                menu.classList.add('flex');
+            } else {
+                menu.classList.add('hidden');
+                menu.classList.remove('flex');
+            }
+        }
+
+        // Initialize Icons
+        document.addEventListener("DOMContentLoaded", function() {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        });
+
+        // SIMULATOR LOGIC (Three.js)
+        let scene, camera, renderer, plane;
+        let isSimRunning = false;
+        let pitch = 0;
+        let roll = 0;
+        let targetPitch = 0;
+        let targetRoll = 0;
+        let solarFlareActive = false;
+
+        function initThreeJS() {
+            if (renderer) return; 
+
+            const container = document.getElementById('canvas-wrapper');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000); // Night/Space
+            scene.fog = new THREE.Fog(0x000000, 1, 60);
+
+            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.z = 5;
+            camera.position.y = 1;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            const light = new THREE.DirectionalLight(0xffffff, 1);
+            light.position.set(1, 1, 1);
+            scene.add(light);
+            const ambient = new THREE.AmbientLight(0x404040);
+            scene.add(ambient);
+
+            // Horizon Grid (PFD Style)
+            const gridHelper = new THREE.GridHelper(200, 50, 0x00ff00, 0x004400);
+            gridHelper.position.y = -5;
+            scene.add(gridHelper);
+            
+            // Sky Grid (Inverted)
+            const skyGrid = new THREE.GridHelper(200, 50, 0x00ffff, 0x001133);
+            skyGrid.position.y = 5;
+            skyGrid.rotation.x = Math.PI;
+            scene.add(skyGrid);
+
+            // Plane Model
+            plane = new THREE.Group();
+            
+            const bodyGeo = new THREE.BoxGeometry(1, 0.2, 3);
+            const bodyMat = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x222222 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            plane.add(body);
+
+            const wingGeo = new THREE.BoxGeometry(4, 0.05, 1);
+            const wingMat = new THREE.MeshPhongMaterial({ color: 0xcccccc });
+            const wing = new THREE.Mesh(wingGeo, wingMat);
+            wing.position.z = 0;
+            plane.add(wing);
+
+            const tailGeo = new THREE.BoxGeometry(1.2, 0.05, 0.8);
+            const tail = new THREE.Mesh(tailGeo, wingMat);
+            tail.position.z = 1.3;
+            tail.position.y = 0.1;
+            plane.add(tail);
+
+            scene.add(plane);
+
+            // Input
+            const inputContainer = document.getElementById('sim-container');
+            
+            const handleInput = (x, y) => {
+                 if (!isSimRunning) return;
+                 // Visual Stick Update
+                 const stick = document.getElementById('stick-position');
+                 const maxMove = 40; // pixels
+                 stick.style.transform = `translate(${(x-0.5)*maxMove}px, ${(y-0.5)*maxMove}px)`;
+
+                 targetRoll = (x - 0.5) * -1.5;
+                 targetPitch = (y - 0.5) * 1.5;
+            };
+
+            inputContainer.addEventListener('mousemove', (e) => {
+                const rect = container.getBoundingClientRect();
+                handleInput(
+                    (e.clientX - rect.left) / rect.width,
+                    (e.clientY - rect.top) / rect.height
+                );
+            });
+
+            inputContainer.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const rect = container.getBoundingClientRect();
+                const touch = e.touches[0];
+                handleInput(
+                    (touch.clientX - rect.left) / rect.width,
+                    (touch.clientY - rect.top) / rect.height
+                );
+            }, { passive: false });
+
+            window.addEventListener('resize', () => {
+                if(container.clientHeight > 0) {
+                    camera.aspect = container.clientWidth / container.clientHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(container.clientWidth, container.clientHeight);
+                }
+            });
+
+            animate();
+        }
+
+        function startSim() {
+            isSimRunning = true;
+            document.getElementById('sim-message').classList.add('hidden');
+            solarFlareLoop();
+        }
+
+        function solarFlareLoop() {
+            if (!isSimRunning) return;
+            const delay = Math.random() * 5000 + 4000;
+            setTimeout(() => {
+                triggerSolarFlare();
+                solarFlareLoop();
+            }, delay);
+        }
+
+        function triggerSolarFlare() {
+            if (!isSimRunning) return;
+            solarFlareActive = true;
+            document.getElementById('solar-warning').classList.remove('hidden');
+            document.getElementById('solar-warning').classList.add('flex'); // Ensure flex display
+            
+            setTimeout(() => {
+                solarFlareActive = false;
+                document.getElementById('solar-warning').classList.add('hidden');
+                document.getElementById('solar-warning').classList.remove('flex');
+            }, 3000);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (isSimRunning) {
+                const sensitivity = 0.05;
+                
+                if (solarFlareActive) {
+                    targetPitch = 0.8; // Nose Down
+                    targetRoll += (Math.random() - 0.5) * 0.2; // Jitter
+                }
+
+                pitch += (targetPitch - pitch) * sensitivity;
+                roll += (targetRoll - roll) * sensitivity;
+
+                plane.rotation.x = pitch;
+                plane.rotation.z = roll;
+
+                // Move grid
+                scene.children[2].position.z += 0.5; // ground
+                scene.children[3].position.z += 0.5; // sky
+                if (scene.children[2].position.z > 25) scene.children[2].position.z = -25;
+                if (scene.children[3].position.z > 25) scene.children[3].position.z = -25;
+
+                // Update HUD Numbers
+                document.getElementById('sim-alt').innerText = Math.floor(32000 - (pitch * 2000));
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
